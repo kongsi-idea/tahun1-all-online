@@ -172,3 +172,8 @@ h1, h2, h3 { font-family: "ZCOOL KuaiLe", "Noto Sans SC", sans-serif; font-weigh
 .helpchip { display: inline-flex; align-items: center; gap: 6px; background: var(--berry); border-color: #b93640; color: #fff; font-size: 17px; animation: shake .6s 3; }
 .cell b { font-size: 13px; } .wgrow .cell b { font-size: 13px; }
 .hrow span { font-size: 17px; }
+
+/* 手写板全屏：学生只能看 */
+.boardfs { position: fixed; inset: 0; z-index: 100; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 8px; user-select: none; -webkit-user-select: none; touch-action: none; }
+.boardfs canvas { width: min(100%, calc((100vh - 70px) * 5 / 3)); height: auto; aspect-ratio: 5/3; background: #fff; border: 2px solid var(--line); border-radius: 12px; pointer-events: none; }
+.bq { display: flex; align-items: center; gap: 14px; max-width: 100%; pointer-events: none; font-size: clamp(18px, 3.4vw, 28px); } .bq b { font-family: "ZCOOL KuaiLe", sans-serif; font-weight: 400; } .bqv .vis-svg { width: 56px; } .bqv .vis-emoji, .bqv .vis-emoji2 { font-size: 20px; } .bqv .vis-text { font-size: 28px; } .bqv .vis-coin { width: 34px; height: 34px; } .bqv .vis-note { width: 70px; height: 35px; }

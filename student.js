@@ -200,6 +200,11 @@ function render() {
   if (!S.room) return renderRoom();
   if (!S.seat) return renderSeat();
   if (!AV.icons[S.seat] || S.picking) return renderIcon();
+  if (S.board) { // 老师开手写板：全屏专心看，学生什么都不能操作
+    const q = S.q && S.phase !== "wait" ? S.q : null;
+    $app.innerHTML = `<div class="boardfs">${q ? `<div class="bq"><b>${h(q.stem)}</b>${q.visual ? `<div class="bqv">${Vis.render(q.visual)}</div>` : ""}</div>` : ""}<canvas id="inkcv" width="1200" height="720"></canvas></div>`;
+    inkRedraw(); return;
+  }
   let body = "";
   if (S.phase === "wait" || !S.q) {
     body = `<section class="wait"><div class="dots"><i></i><i></i><i></i></div><h1>老师马上出题</h1><p>请听老师说话，题目一出来会“叮咚”叫你</p></section>`;
@@ -209,12 +214,9 @@ function render() {
     const m = myAnswer();
     body = questionHtml() + `<section class="locked"><div class="bigicon">${Icon.clock}</div><h2>时间到！</h2><p>${m === null ? "这题你没有答" : "你的答案：" + (S.q.type === "choice" ? OPT_STYLE[m].shape : m)}</p><p>等老师公布答案</p></section>`;
   } else if (S.phase === "reveal") {
-    body = questionHtml() + revealHtml() + (S.board ? boardHtml() : "");
+    body = questionHtml() + revealHtml();
   }
-  if (S.board && S.phase !== "reveal" && S.q && S.phase !== "wait") body += boardHtml();
-  if (S.board && (S.phase === "wait" || !S.q)) body = boardHtml();
   $app.innerHTML = topbar() + `<div class="stage">${body}</div>`;
-  if (S.board) inkRedraw();
   if (Date.now() < S.helpUntil) tickHelp();
 }
 
