@@ -57,7 +57,7 @@ function nOnline() { return Object.keys(seen).filter((s) => Date.now() - seen[s]
 function nAnswered() { return Object.keys(T.answers[T.qi] || {}).length; }
 function publish() {
   const q = curQ();
-  const msg = { t: "state", seq: Date.now(), phase: T.phase, qi: T.qi, total: bank() ? bank().questions.length : 0, board: T.board, prog: { a: nAnswered(), n: Math.max(nOnline(), Object.keys(T.joined).length) } };
+  const msg = { t: "state", seq: Date.now(), phase: T.phase, qi: T.qi, total: bank() ? bank().questions.length : 0, board: T.board, prog: { a: nAnswered(), n: Math.max(nOnline(), nAnswered()) } };
   if (q && T.phase !== "wait") msg.q = qPublic(q);
   if (q && T.phase === "reveal") msg.rev = { ans: q.ans, why: q.why || "", dist: dist() };
   Room.send(msg);
@@ -68,7 +68,7 @@ function pushProg() {
   if (progTimer) return;
   progTimer = setTimeout(() => {
     progTimer = null;
-    Room.send({ t: "prog", a: nAnswered(), n: Math.max(nOnline(), Object.keys(T.joined).length) });
+    Room.send({ t: "prog", a: nAnswered(), n: Math.max(nOnline(), nAnswered()) });
   }, 700);
 }
 
@@ -112,8 +112,7 @@ function onMsg(m) {
   if (s && m.icon && AV.icons[s] !== m.icon) { AV.icons[s] = m.icon; T.icons = AV.icons; }
   if (m.t === "join" || m.t === "hello") {
     if (s) T.joined[s] = Date.now();
-    clearTimeout(onMsg.rt);
-    onMsg.rt = setTimeout(() => { sendRoster(); publish(); sendInk(); }, 600);
+    if (!onMsg.rt) onMsg.rt = setTimeout(() => { onMsg.rt = null; sendRoster(); publish(); sendInk(); }, 600); // 不重置计时，免得连续刷新的人被饿死
   } else if (m.t === "hb") {
     T.joined[s] = Date.now();
   } else if (m.t === "ans") {
@@ -199,7 +198,7 @@ function draw() {
     <section class="tcenter" ${tab === "board" ? 'style="display:none"' : ""}>
       <div class="qnav">${b ? b.questions.map((_, i) => `<button class="${i === T.qi ? "on" : ""} ${T.answers[i] ? "done" : ""}" onclick="jump(${i})">${i + 1}</button>`).join("") : ""}</div>
       ${preview()}
-      <div class="tstats"><div class="tstat-h">已交 <b>${nAnswered()}</b> / ${Math.max(nOnline(), Object.keys(T.joined).length)}</div>${statsHtml()}</div>
+      <div class="tstats"><div class="tstat-h">已交 <b>${nAnswered()}</b> / ${Math.max(nOnline(), nAnswered())}</div>${statsHtml()}</div>
       <button class="primary ${T.phase}" onclick="primary()">${PRI[T.phase]}</button>
     </section>
     <section class="tboard" ${tab === "board" ? "" : 'style="display:none"'}>

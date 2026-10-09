@@ -35,7 +35,7 @@ function startRoom() {
   Room.connect(S.room, onMsg, (st) => {
     S.connected = st === "SUBSCRIBED";
     $conn.hidden = S.connected;
-    if (S.connected) { S.needResend = true; Room.send({ t: "hello", seat: S.seat || 0, icon: AV.icons[S.seat] }); }
+    if (S.connected) { S.needResend = true; Room.send({ t: "hello", seat: S.seat || 0, icon: AV.icons[S.seat] }); if (S.seat && S.light) Room.send({ t: "light", seat: S.seat, c: S.light }); }
   });
   setInterval(() => { if (S.connected && S.seat) Room.send({ t: "hb", seat: S.seat, icon: AV.icons[S.seat] }); }, 15000);
 }
