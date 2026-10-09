@@ -219,8 +219,6 @@ function draw() {
       <canvas id="tcv" width="1200" height="720"></canvas>
     </section>
     <aside class="tright">
-      <h3>求救 ${helps.length ? `<b class="red">${helps.length}</b>` : ""}</h3>
-      ${helps.map((h) => `<div class="hrow"><span>${avatar(h.seat, 24)} ${Roster.name(h.seat) || h.seat + " 号"}</span><button class="chip" onclick="resolveHelp(${h.seat})">处理了</button></div>`).join("") || '<p class="muted">没有人求救</p>'}
       <h3>座位墙 <small>灰=未进入 · 绿框=已交 · 圆点=懂不懂</small></h3>
       ${attendHtml()}
       <div class="wall">${seatWall()}</div>
