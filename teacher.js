@@ -79,7 +79,7 @@ function pushProg() {
 /* ── 主按钮：出题 → 截止 → 公布 → 下一题 ── */
 function primary() {
   const b = bank(); if (!b) return;
-  if (T.phase === "wait") { T.qi = 0; T.phase = "q"; T.answers[qk()] = T.answers[qk()] || {}; }
+  if (T.phase === "wait") { T.qi = 0; T.phase = "q"; T.answers[qk()] = {}; }
   else if (T.phase === "q") T.phase = "lock";
   else if (T.phase === "lock") { T.phase = "reveal"; tally(); }
   else if (T.phase === "reveal") {
@@ -96,7 +96,7 @@ function tally() {
   if (T.scored[key]) return; T.scored[key] = 1;
   Object.entries(T.answers[qk()] || {}).forEach(([s, v]) => { if (Number(v) === Number(q.ans)) T.score[s] = (T.score[s] || 0) + 1; });
 }
-function jump(i) { T.board = false; T.qi = i; T.phase = "q"; T.answers[ak(i)] = T.answers[ak(i)] || {}; publish(); }
+function jump(i) { T.board = false; T.qi = i; T.phase = "q"; T.answers[ak(i)] = {}; publish(); }
 function pickBank(id) { if (id === "adhoc" && !T.adhocQs.length) { adhocDlg(); return; } T.bankId = id; T.qi = -1; T.phase = "wait"; publish(); }
 function toggleBoard() { T.board = !T.board; publish(); }
 function newRoom() {

@@ -232,3 +232,14 @@ h1, h2, h3 { font-family: "ZCOOL KuaiLe", "Noto Sans SC", sans-serif; font-weigh
   .lt small { display: inline; font-size: 14px; } .ld { margin: 0; width: 22px; height: 22px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* 座位墙更紧凑，iPad 横屏一屏看完 7 组 */
+.wgrp { margin-bottom: 2px; } .wgrp small { display: block; font-size: 11px; line-height: 1.1; }
+.wgrow .cell { padding: 2px 0 1px; border-width: 2px; } .wgrow .cell b { font-size: 12px; } .wgrow .avc { --s: 20px !important; font-size: 11px; }
+.wgrow .cell i.ph-fill { font-size: 12px !important; }
+.att { padding: 6px 10px; margin-bottom: 4px; font-size: 13px; } .tright h3 { margin: 4px 4px 4px; }
+@media (max-width: 560px) {
+  .qvis .vis-svg { max-height: 22vh; } .qvis .vis-money, .qvis .vis-emoji2 { zoom: .8; }
+  .qcard { padding: 12px; } .stage { gap: 10px; padding-top: 10px; }
+  .keypad button { height: 56px; } .numshow { min-height: 60px; font-size: 48px; width: 220px; }
+}
