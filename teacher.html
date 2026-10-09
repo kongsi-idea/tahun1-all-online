@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:,">
+  <title>老师控制台 · 网课同步作答</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;700;900&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="tch">
+  <div id="app"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="https://kongsi-idea.vercel.app/data/supabase-client.js"></script>
+  <script src="common.js"></script>
+  <!-- 题库：只有老师端载入（含正确答案），学生端永远拿不到 -->
+  <script src="banks/bc-u1.js"></script><script src="banks/bc-u2.js"></script><script src="banks/bc-u3.js"></script>
+  <script src="banks/bc-u4.js"></script><script src="banks/bc-u5.js"></script><script src="banks/bc-u6.js"></script>
+  <script src="banks/bc-u7.js"></script><script src="banks/bc-u8.js"></script><script src="banks/bc-u9.js"></script>
+  <script src="banks/bc-u10.js"></script><script src="banks/bc-u11.js"></script><script src="banks/bc-u12.js"></script>
+  <script src="banks/mt-pecahan.js"></script><script src="banks/mt-wang.js"></script><script src="banks/mt-masa.js"></script>
+  <script src="banks/mt-ukur.js"></script><script src="banks/mt-ruang.js"></script><script src="banks/mt-data.js"></script>
+  <script src="banks/mt-selesai.js"></script><script src="banks/mt-campur.js"></script>
+  <script src="teacher.js"></script>
+</body>
+</html>
