@@ -35,7 +35,7 @@ function startRoom() {
   Room.connect(S.room, onMsg, (st) => {
     S.connected = st === "SUBSCRIBED";
     $conn.hidden = S.connected;
-    if (S.connected) { Room.send({ t: "hello", seat: S.seat || 0, icon: AV.icons[S.seat] }); }
+    if (S.connected) { S.needResend = true; Room.send({ t: "hello", seat: S.seat || 0, icon: AV.icons[S.seat] }); }
   });
   setInterval(() => { if (S.connected && S.seat) Room.send({ t: "hb", seat: S.seat, icon: AV.icons[S.seat] }); }, 15000);
 }
@@ -55,6 +55,7 @@ function onMsg(m) {
       const mine = myAnswer();
       if (mine !== null) (isRight() ? Beep.ok : Beep.no)();
     }
+    if (S.needResend && m.phase === "q") { S.needResend = false; if (myAnswer() !== null) sendAns(); }
     render();
   } else if (m.t === "roster") {
     Roster.set(m.groups); if (!S.seat || S.seat) render();
