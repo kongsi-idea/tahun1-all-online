@@ -1,28 +1,28 @@
 # 网课同步作答 · 交接
 
 ## ⏯️ 目前做到哪
-2026-10-09 一口气做出 v1：老师控制台（teacher.html）＋学生端（index.html）＋20 份题库（华文第1–12单元、数学8个主题，各10题）。
-实时连线用 Supabase Realtime Broadcast（共用 kongsi-idea 的 Supabase project，**不建表、不存任何资料**）。
-本地 Playwright 联机验收已交给 verify；真实 iPad／学生设备实测待老师。
+2026-10-09 v1 已上线（Vercel：tahun1-all-online.vercel.app，push main 自动部署）。仅老师自用，**未上架 Hub**。
+- 老师控制台 teacher.html、学生端 index.html；20 份题库（华文第1–12单元、数学8主题各10题）+ 即兴题（老师现场设数字/选择题与答案）。
+- 学生只点名字（名单只存老师浏览器，由老师链接 `#r=房号&roster=base64` 一次导入，不进源码；链接存 ~/Documents/工作档案/网课同步作答-老师链接.txt）。
+- 累计答对数跨题库累计（T.score／T.scored），学生页顶部显示「今天答对 X / 共 Y」。
+- 手写板：老师 iPad+Pencil，学生端全屏只读；老师出题时自动关闭看板。
 
-## 🧩 架构（一句话）
-老师页是“唯一的真相来源”：持有题库与正确答案，经 Broadcast 频道 `online-<4位房号>` 发 `state`；学生只发 `join/hb/ans/help/light/hello`。学生端永远拿不到答案，公布时才收到。手写板笔迹以 `ink` 批次广播，晚到的学生用 `hello` 触发 `inkfull` 重放。
+## 🧩 架构
+老师页是唯一真相来源，持有题库与答案；Broadcast 频道 `online-<房号>`；学生发 hello/join/hb/ans/help/light，老师发 state/prog/roster/ink*。答案按「题库:题号」分开记（曾有跨题库残留旧答案的 bug，已修）。
 
-## 🚦 目前状态
-- 课本出处：华文题库来自 `华文课本资料/一年级华文课本_全文提取.txt`，每题带 ref 页码
-- DSKP 对照：数学题库按 `kongsi-idea/docs/dskp/tahun1/matematik.md` 范围；未逐条对 PDF，不写进 Hub 的 DSKP 索引
-- 已知限制：没有账号验证，知道 `teacher.html` 的人理论上能冒充老师（学生端看不到答案，影响有限）；学生座号靠自己点，可能撞号
+## ✅ 验证过
+联机流程、全屏手写板只读、名单导入、35 人并发压测（无丢包、p95≈35ms）、断线重连、座位墙一屏、手机键盘不越界、顶栏求救红条第二行。
+## ❌ 没验过
+真实 iPad+Pencil 手感与手掌防误触、真机 Safari、家里 Wi-Fi 抖动、朗读音质。
 
-## ➡️ 下一步
-1. 老师在 iPad 实测手写板与 Pencil
-2. 学生朗读目前用浏览器语音，之后可改成预录 mp3（模板：tahun1-mt-pecahan 的 gen-voice.py）
-3. 老师端「载入班级名单」把座号显示成名字（ClassCode）尚未做
-4. 上架 Hub（缩图、DSKP、coverage 表）待老师确认后做
+## ➡️ 下一步（Opus 设计评审 B/C 档）
+字体已换楷体+Nunito；待做：答对彩纸、手写板方格/田字格背景、钟面刻度、钱币写实、题库 emoji 换矢量图、座位格状态重编码、老师顶栏精简。求救断线期间不补发。
 
-## ⚠️ 注意事项
-- 本机测试：`python3 -m http.server 8123`，老师 http://localhost:8123/teacher.html ，学生 http://localhost:8123/?r=房号
-- 加新题库：照 `bank-spec.md` 写 `banks/xxx.js`，并在 `teacher.html` 加一行 script
-- Supabase Realtime 免费版并发连线有上限（整个 kongsi-idea project 共用），一班 30 多人没问题
+## ⚠️ 注意
+- 没有账号验证：知道 teacher.html 的人可冒充老师；学生端拿不到答案。
+- 房号 6 位数；学生链接固定 ?r=房号。
+- 浏览器会缓存旧版，上课前强制刷新。
+- 本机测试：python3 -m http.server 8123
 
 ## 🕐 最后更新
 2026-10-09
