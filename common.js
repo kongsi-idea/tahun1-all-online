@@ -177,3 +177,33 @@ const Beep = (() => {
   function no() { unlock(); tone(300, 0, 0.25); }
   return { unlock, ping, ok, no };
 })();
+
+/* ── 名单：只存在老师的浏览器，由老师经课堂频道临时发给学生，不进源码、不存服务器 ── */
+const Roster = {
+  groups: null,
+  set(g) { this.groups = Array.isArray(g) && g.length ? g : null; },
+  flat() { return this.groups ? [].concat(...this.groups) : []; },
+  name(i) { return this.groups ? (this.flat()[i - 1] || "") : ""; },
+  count() { return this.groups ? this.flat().length : 0; },
+  startOf(gi) { let n = 0; for (let k = 0; k < gi; k++) n += this.groups[k].length; return n; },
+  parse(text) { return text.split(/\n/).map((l) => l.split(/[\s,，、;；]+/).filter(Boolean)).filter((g) => g.length); }
+};
+
+/* ── 图标与头像（不用 emoji） ── */
+const Icon = {
+  speaker: '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>',
+  help: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.3a3 3 0 115 2c-1.2.8-2.2 1.3-2.2 2.9"/><circle cx="12" cy="17.6" r=".6" fill="currentColor"/></svg>',
+  check: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" width="72" height="72" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 8.5V13l3 2M9.5 2.5h5"/></svg>',
+  bulb: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>'
+};
+const AV_COLORS = ["#E8505B","#3B82F6","#22A06B","#E08A1E","#7C5CE0","#0E9AA7","#C2528B","#5C7A29"];
+const AV = { icons: {} };
+const AV_ICONS = ["cat","dog","bird","fish","butterfly","horse","cow","rabbit","flower-lotus","leaf","star","heart","moon","sun","rocket","airplane","bicycle","crown","lightning","ice-cream","balloon","sailboat","soccer-ball","cactus","acorn","paw-print","cookie","cloud","tree","planet","ghost","bug"];
+function iconColor(key) { const k = AV_ICONS.indexOf(key); return AV_COLORS[(k < 0 ? 0 : k) % AV_COLORS.length]; }
+function avatar(i, size) {
+  const nm = Roster.name(i), ic = AV.icons[i], s = size || 36;
+  if (ic) return `<span class="avc" style="--s:${s}px;background:${iconColor(ic)}"><i class="ph-fill ph-${ic}" style="font-size:${Math.round(s * 0.6)}px"></i></span>`;
+  const txt = nm ? nm[0] : String(i);
+  return `<span class="avc" style="--s:${s}px;background:#9aa0b3">${Vis.esc(txt)}</span>`;
+}

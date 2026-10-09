@@ -15,7 +15,7 @@ const S = {
   seat: 0,
   phase: "wait", qi: -1, total: 0, q: null, rev: null, board: false, prog: { a: 0, n: 0 },
   sel: null, numBuf: "", stateAt: 0,
-  helpUntil: 0, light: "", connected: false,
+  helpUntil: 0, light: "", connected: false, picking: false,
   ink: { strokes: [], byId: {} }
 };
 
@@ -25,7 +25,7 @@ function flashTitle() {
   if (!document.hidden) return;
   const base = document.title; let on = true;
   const t = setInterval(() => {
-    document.title = on ? "✏️ 老师出题啦！" : base; on = !on;
+    document.title = on ? "老师出题啦！" : base; on = !on;
     if (!document.hidden) { clearInterval(t); document.title = base; }
   }, 900);
 }
@@ -35,9 +35,9 @@ function startRoom() {
   Room.connect(S.room, onMsg, (st) => {
     S.connected = st === "SUBSCRIBED";
     $conn.hidden = S.connected;
-    if (S.connected && S.seat) { Room.send({ t: "hello", seat: S.seat }); }
+    if (S.connected) { Room.send({ t: "hello", seat: S.seat || 0, icon: AV.icons[S.seat] }); }
   });
-  setInterval(() => { if (S.connected && S.seat) Room.send({ t: "hb", seat: S.seat }); }, 15000);
+  setInterval(() => { if (S.connected && S.seat) Room.send({ t: "hb", seat: S.seat, icon: AV.icons[S.seat] }); }, 15000);
 }
 
 function onMsg(m) {
@@ -56,6 +56,8 @@ function onMsg(m) {
       if (mine !== null) (isRight() ? Beep.ok : Beep.no)();
     }
     render();
+  } else if (m.t === "roster") {
+    Roster.set(m.groups); if (!S.seat || S.seat) render();
   } else if (m.t === "prog") {
     S.prog = { a: m.a, n: m.n };
     const el = document.getElementById("prog"); if (el) el.innerHTML = progHtml();
@@ -129,8 +131,8 @@ function help() {
 function tickHelp() {
   const b = document.getElementById("helpbtn"); if (!b) return;
   const left = Math.ceil((S.helpUntil - Date.now()) / 1000);
-  if (left > 0) { b.disabled = true; b.innerHTML = `<span>✋</span><small>老师收到了 ${left}</small>`; setTimeout(tickHelp, 500); }
-  else { b.disabled = false; b.innerHTML = `<span>🆘</span><small>求救</small>`; }
+  if (left > 0) { b.disabled = true; b.innerHTML = `<span>${Icon.check}</span><small>老师收到了 ${left}</small>`; setTimeout(tickHelp, 500); }
+  else { b.disabled = false; b.innerHTML = `<span>${Icon.help}</span><small>求救</small>`; }
 }
 function setLight(c) {
   S.light = c; persist(); Room.send({ t: "light", seat: S.seat, c }); render();
@@ -144,19 +146,19 @@ function progHtml() {
 function topbar() {
   const left = Math.ceil((S.helpUntil - Date.now()) / 1000);
   return `<header class="topbar">
-    <div class="me"><span class="av">${SEAT_ANIMALS[(S.seat - 1) % SEAT_ANIMALS.length]}</span><b>${S.seat} 号</b>${S.total ? `<small>第 ${S.qi + 1}/${S.total} 题</small>` : ""}</div>
+    <div class="me"><button class="avbtn" onclick="pickIcon()" aria-label="换图标">${avatar(S.seat, 44)}</button><b>${Roster.name(S.seat) ? h(Roster.name(S.seat)) : S.seat + " 号"}</b>${S.total ? `<small>第 ${S.qi + 1}/${S.total} 题</small>` : ""}</div>
     <div class="lights" role="group" aria-label="我懂不懂">
-      <button class="lt g ${S.light === "g" ? "on" : ""}" onclick="setLight('g')">😀<small>懂了</small></button>
-      <button class="lt y ${S.light === "y" ? "on" : ""}" onclick="setLight('y')">🤔<small>有点懂</small></button>
-      <button class="lt r ${S.light === "r" ? "on" : ""}" onclick="setLight('r')">😟<small>不懂</small></button>
+      <button class="lt g ${S.light === "g" ? "on" : ""}" onclick="setLight('g')"><i class="ld"></i><small>懂了</small></button>
+      <button class="lt y ${S.light === "y" ? "on" : ""}" onclick="setLight('y')"><i class="ld"></i><small>有点懂</small></button>
+      <button class="lt r ${S.light === "r" ? "on" : ""}" onclick="setLight('r')"><i class="ld"></i><small>不懂</small></button>
     </div>
-    <button id="helpbtn" class="help" onclick="help()" ${left > 0 ? "disabled" : ""}>${left > 0 ? `<span>✋</span><small>老师收到了</small>` : `<span>🆘</span><small>求救</small>`}</button>
+    <button id="helpbtn" class="help" onclick="help()" ${left > 0 ? "disabled" : ""}>${left > 0 ? `<span>${Icon.check}</span><small>老师收到了</small>` : `<span>${Icon.help}</span><small>求救</small>`}</button>
   </header>`;
 }
 function questionHtml() {
   const q = S.q; if (!q) return "";
   return `<section class="qcard">
-    <div class="qtop"><button class="say" onclick="Speak.say(S.q.say||S.q.stem)" aria-label="朗读题目">🔊</button><h1>${h(q.stem)}</h1></div>
+    <div class="qtop"><button class="say" onclick="Speak.say(S.q.say||S.q.stem)" aria-label="朗读题目">${Icon.speaker}</button><h1>${h(q.stem)}</h1></div>
     ${q.visual ? `<div class="qvis">${Vis.render(q.visual)}</div>` : ""}
   </section>`;
 }
@@ -187,24 +189,25 @@ function revealHtml() {
     return `<div class="drow ${Number(k) === Number(r.ans) ? "ok" : ""}"><span>${h(label)}</span><i style="width:${Math.max(6, Math.round((n / tot) * 100))}%"></i><b>${n}</b></div>`;
   }).join("");
   const verdict = mine === null ? `<div class="res none">这题你还没答 · 没关系，看看答案</div>`
-    : isRight() ? `<div class="res good">🎉 答对了！</div>` : `<div class="res bad">差一点点 · 看看正确答案</div>`;
+    : isRight() ? `<div class="res good">答对了！</div>` : `<div class="res bad">差一点点 · 看看正确答案</div>`;
   return `${verdict}
     <div class="answer">正确答案：<b>${rightTxt}</b></div>
-    ${r.why ? `<p class="why">💡 ${h(r.why)}</p>` : ""}
+    ${r.why ? `<p class="why"><span class="bulb">${Icon.bulb}</span>${h(r.why)}</p>` : ""}
     <div class="dist"><small>全班怎么选</small>${rows}</div>`;
 }
 
 function render() {
   if (!S.room) return renderRoom();
   if (!S.seat) return renderSeat();
+  if (!AV.icons[S.seat] || S.picking) return renderIcon();
   let body = "";
   if (S.phase === "wait" || !S.q) {
-    body = `<section class="wait"><div class="big">🦖</div><h1>老师马上出题</h1><p>请听老师说话，题目一出来会“叮咚”叫你</p></section>`;
+    body = `<section class="wait"><div class="dots"><i></i><i></i><i></i></div><h1>老师马上出题</h1><p>请听老师说话，题目一出来会“叮咚”叫你</p></section>`;
   } else if (S.phase === "q") {
     body = questionHtml() + answerArea() + `<div id="prog" class="prog">${progHtml()}</div>`;
   } else if (S.phase === "lock") {
     const m = myAnswer();
-    body = questionHtml() + `<section class="locked"><div class="big">⏰</div><h2>时间到！</h2><p>${m === null ? "这题你没有答" : "你的答案：" + (S.q.type === "choice" ? OPT_STYLE[m].shape : m)}</p><p>等老师公布答案</p></section>`;
+    body = questionHtml() + `<section class="locked"><div class="bigicon">${Icon.clock}</div><h2>时间到！</h2><p>${m === null ? "这题你没有答" : "你的答案：" + (S.q.type === "choice" ? OPT_STYLE[m].shape : m)}</p><p>等老师公布答案</p></section>`;
   } else if (S.phase === "reveal") {
     body = questionHtml() + revealHtml() + (S.board ? boardHtml() : "");
   }
@@ -216,7 +219,7 @@ function render() {
 }
 
 function renderRoom() {
-  $app.innerHTML = `<div class="stage center"><section class="join"><div class="big">🏫</div><h1>输入课堂号码</h1><p>老师在 Meet 聊天室给了 4 个数字</p>
+  $app.innerHTML = `<div class="stage center"><section class="join"><h1>输入课堂号码</h1><p>老师在 Meet 聊天室给了 4 个数字</p>
     <input id="rc" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000"><button class="go" onclick="setRoom()">进入</button></section></div>`;
 }
 function setRoom() {
@@ -226,19 +229,37 @@ function setRoom() {
 }
 function renderSeat() {
   let g = "";
-  for (let i = 1; i <= 40; i++) g += `<button onclick="setSeat(${i})"><span>${SEAT_ANIMALS[i - 1]}</span><b>${i}</b></button>`;
+  if (Roster.groups) {
+    Roster.groups.forEach((grp, gi) => {
+      const st = Roster.startOf(gi);
+      g += `<div class="sg"><small>第 ${gi + 1} 组</small><div class="sgrow">${grp.map((nm, k) => `<button onclick="setSeat(${st + k + 1})">${avatar(st + k + 1, 38)}<b>${h(nm)}</b></button>`).join("")}</div></div>`;
+    });
+    $app.innerHTML = `<div class="stage center"><section class="join"><h1>你是谁？</h1><p>点你的名字</p>${g}</section></div>`;
+    return;
+  }
+  for (let i = 1; i <= 40; i++) g += `<button onclick="setSeat(${i})">${avatar(i, 34)}<b>${i}</b></button>`;
   $app.innerHTML = `<div class="stage center"><section class="join"><h1>你是几号？</h1><p>点你的座号</p><div class="seatgrid">${g}</div></section></div>`;
+}
+function renderIcon() {
+  $app.innerHTML = `<div class="stage center"><section class="join"><h1>选你的小图标</h1><p>${Roster.name(S.seat) ? h(Roster.name(S.seat)) + "，" : ""}点一个喜欢的</p>
+    <div class="icongrid">${AV_ICONS.map((k) => `<button style="--c:${iconColor(k)}" onclick="setIcon('${k}')" aria-label="${k}"><i class="ph-fill ph-${k}"></i></button>`).join("")}</div></section></div>`;
+}
+function pickIcon() { S.picking = true; render(); }
+function setIcon(k) {
+  AV.icons[S.seat] = k; store.set("ol-icon-" + S.room + "-" + S.seat, k); S.picking = false;
+  Room.send({ t: "join", seat: S.seat, icon: k }); render();
 }
 function setSeat(i) {
   Beep.unlock();
-  S.seat = i; store.set("ol-seat-" + S.room, String(i));
-  Room.send({ t: "join", seat: i }); render();
+  S.seat = i; store.set("ol-seat-" + S.room, String(i)); { const ic = store.get("ol-icon-" + S.room + "-" + i); if (ic) AV.icons[i] = ic; }
+  Room.send({ t: "join", seat: i, icon: AV.icons[i] }); render();
 }
 
 (function init() {
-  window.setRoom = setRoom; window.setSeat = setSeat; window.pickOpt = pickOpt; window.key = key;
+  window.setIcon = setIcon; window.pickIcon = pickIcon; window.setRoom = setRoom; window.setSeat = setSeat; window.pickOpt = pickOpt; window.key = key;
   window.submitNum = submitNum; window.help = help; window.setLight = setLight;
   if (S.room) { store.set("ol-room", S.room); S.seat = Number(store.get("ol-seat-" + S.room)) || 0;
+    { const ic = store.get("ol-icon-" + S.room + "-" + S.seat); if (ic) AV.icons[S.seat] = ic; }
     try { const a = JSON.parse(store.get("ol-a-" + S.room) || "null"); if (a) { S.qi = a.qi; S.sel = a.sel; S.numBuf = a.numBuf || ""; S.light = a.light || ""; S.submitted = a.submitted; } } catch (e) {} }
   render();
   if (S.room) startRoom();

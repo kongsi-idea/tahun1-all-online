@@ -8,7 +8,9 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
 const BANKS = (window.BANKS || []);
-const SEATS = 40;
+const SEATS_DEFAULT = 40;
+Roster.set(store.get("ol-roster"));
+const seatCount = () => Roster.count() || SEATS_DEFAULT;
 
 let room = store.get("ol-t-room") || String(Math.floor(1000 + Math.random() * 9000));
 store.set("ol-t-room", room);
@@ -17,6 +19,7 @@ const T = Object.assign({
   bankId: BANKS[0] ? BANKS[0].id : "", qi: -1, phase: "wait", board: false,
   answers: {}, joined: {}, helps: [], lights: {}, score: {}, strokes: []
 }, store.get("ol-t-state-" + room) || {});
+AV.icons = T.icons || {};
 let tab = "run", conn = false, seen = {}; // seen[seat] = 最近一次收到讯息的时间
 
 const bank = () => BANKS.find((b) => b.id === T.bankId) || BANKS[0];
@@ -89,12 +92,13 @@ function resolveHelp(seat) { T.helps = T.helps.filter((h) => h.seat !== seat); s
 
 /* ── 收到学生讯息 ── */
 function onMsg(m) {
-  if (!m || !m.seat && m.t !== "hello") return;
+  if (!m || (!m.seat && m.t !== "hello")) return;
   const s = m.seat; if (s) seen[s] = Date.now();
+  if (s && m.icon && AV.icons[s] !== m.icon) { AV.icons[s] = m.icon; T.icons = AV.icons; }
   if (m.t === "join" || m.t === "hello") {
-    T.joined[s] = Date.now();
+    if (s) T.joined[s] = Date.now();
     clearTimeout(onMsg.rt);
-    onMsg.rt = setTimeout(() => { publish(); sendInk(); }, 600);
+    onMsg.rt = setTimeout(() => { sendRoster(); publish(); sendInk(); }, 600);
   } else if (m.t === "hb") {
     T.joined[s] = Date.now();
   } else if (m.t === "ans") {
@@ -110,17 +114,26 @@ let drawT = null;
 function scheduleDraw() { if (drawT) return; drawT = setTimeout(() => { drawT = null; save(); draw(); }, 250); }
 
 /* ── 画面 ── */
-function seatWall() {
+function cellHtml(i) {
   const a = T.answers[T.qi] || {}, q = curQ();
-  let out = "";
-  for (let i = 1; i <= SEATS; i++) {
-    const online = seen[i] && Date.now() - seen[i] < 50000, helped = T.helps.some((h) => h.seat === i);
-    const answered = a[i] !== undefined, right = q && T.phase === "reveal" && answered && Number(a[i]) === Number(q.ans);
-    const cls = ["cell", T.joined[i] ? (online ? "on" : "away") : "off", answered ? "ans" : "", helped ? "help" : "", T.phase === "reveal" && answered ? (right ? "right" : "wrong") : ""].join(" ");
-    const lt = T.lights[i] ? `<i class="dot ${T.lights[i]}"></i>` : "";
-    out += `<button class="${cls}" onclick="resolveHelp(${i})" title="${i} 号"><span>${SEAT_ANIMALS[i - 1]}</span><b>${i}</b>${lt}${T.score[i] ? `<em>⭐${T.score[i]}</em>` : ""}</button>`;
+  const online = seen[i] && Date.now() - seen[i] < 50000, helped = T.helps.some((h) => h.seat === i);
+  const answered = a[i] !== undefined, right = q && T.phase === "reveal" && answered && Number(a[i]) === Number(q.ans);
+  const cls = ["cell", T.joined[i] ? (online ? "on" : "away") : "off", answered ? "ans" : "", helped ? "help" : "", T.phase === "reveal" && answered ? (right ? "right" : "wrong") : ""].join(" ");
+  const lt = T.lights[i] ? `<i class="dot ${T.lights[i]}"></i>` : "";
+  const nm = Roster.name(i);
+  return `<button class="${cls}" onclick="resolveHelp(${i})" title="${nm || i + " 号"}">${avatar(i, 24)}<b>${nm ? esc(nm) : i}</b>${lt}${T.score[i] ? `<em>${T.score[i]}</em>` : ""}</button>`;
+}
+function seatWall() {
+  if (Roster.groups) {
+    return Roster.groups.map((grp, gi) => { const st = Roster.startOf(gi);
+      return `<div class="wgrp"><small>第${gi + 1}组</small><div class="wgrow">${grp.map((_, k) => cellHtml(st + k + 1)).join("")}</div></div>`; }).join("");
   }
-  return out;
+  let out = ""; for (let i = 1; i <= seatCount(); i++) out += cellHtml(i); return out;
+}
+function attendHtml() {
+  const n = seatCount(); const here = []; const gone = [];
+  for (let i = 1; i <= n; i++) (T.joined[i] ? here : gone).push(Roster.name(i) || i + "号");
+  return `<div class="att"><b>点名：到 ${here.length} / ${n}</b>${gone.length && Roster.groups ? `<p>未到：${gone.map(esc).join("、")}</p>` : ""}</div>`;
 }
 function statsHtml() {
   const q = curQ(); if (!q) return `<p class="muted">按下面的大按钮开始出题</p>`;
@@ -136,13 +149,13 @@ function statsHtml() {
   return rows || `<p class="muted">还没有人交答案</p>`;
 }
 function preview() {
-  const q = curQ(); if (!q) return `<div class="wait"><div class="big">📚</div><h2>${esc(bank() ? bank().title : "没有题库")}</h2><p class="muted">共 ${bank() ? bank().questions.length : 0} 题</p></div>`;
+  const q = curQ(); if (!q) return `<div class="wait"><h2>${esc(bank() ? bank().title : "没有题库")}</h2><p class="muted">共 ${bank() ? bank().questions.length : 0} 题</p></div>`;
   const ans = q.type === "choice" ? `${OPT_STYLE[q.ans].shape} ${esc(typeof q.opts[q.ans] === "string" ? q.opts[q.ans] : (q.opts[q.ans].t || "图"))}` : q.ans;
   return `<div class="qcard"><div class="qtop"><h1>${esc(q.stem)}</h1></div>${q.visual ? `<div class="qvis">${Vis.render(q.visual)}</div>` : ""}
     ${q.type === "choice" ? `<div class="popts">${q.opts.map((o, i) => `<span class="po" style="--c:${OPT_STYLE[i].color}">${OPT_STYLE[i].shape} ${esc(typeof o === "string" ? o : (o.t || ""))}${typeof o === "string" ? "" : Vis.render(o.visual)}</span>`).join("")}</div>` : ""}
-    <p class="tkey">✅ 答案：<b>${ans}</b>　<small>${esc(q.ref || "")}${q.why ? " · " + esc(q.why) : ""}</small></p></div>`;
+    <p class="tkey">答案：<b>${ans}</b>　<small>${esc(q.ref || "")}${q.why ? " · " + esc(q.why) : ""}</small></p></div>`;
 }
-const PRI = { wait: "出题 ▶", q: "截止作答 ⏰", lock: "公布答案 ✅", reveal: "下一题 ➡" };
+const PRI = { wait: "出题", q: "截止作答", lock: "公布答案", reveal: "下一题" };
 
 function draw() {
   const b = bank(), bySubj = {};
@@ -152,13 +165,15 @@ function draw() {
   const html = `
   <header class="thead">
     <div class="rc">课堂号码 <b>${room}</b></div>
-    <button class="chip" onclick="copyLink()">📋 复制学生链接</button>
+    <button class="chip" onclick="copyLink()">复制学生链接</button>
     <span class="chip ${conn ? "okc" : "badc"}">${conn ? "已连线" : "连线中…"}</span>
     <span class="chip">在线 <b>${nOnline()}</b></span>
+    ${helps.map((h) => `<button class="chip helpchip" onclick="resolveHelp(${h.seat})">${avatar(h.seat, 26)}<b>${esc(Roster.name(h.seat) || h.seat + " 号")}</b> 求救 · 处理了</button>`).join("")}
     <span class="grow"></span>
-    <button class="chip ${T.board ? "okc" : ""}" onclick="toggleBoard()">${T.board ? "📝 学生正在看手写板" : "📝 让学生看手写板"}</button>
+    <button class="chip ${T.board ? "okc" : ""}" onclick="toggleBoard()">${T.board ? "学生正在看手写板" : "让学生看手写板"}</button>
     <button class="chip ${tab === "run" ? "tabon" : ""}" onclick="setTab('run')">出题</button>
     <button class="chip ${tab === "board" ? "tabon" : ""}" onclick="setTab('board')">手写板</button>
+    <button class="chip" onclick="editRoster()">名单</button>
     <button class="chip" onclick="resetAll()">清空</button>
   </header>
   <div class="tmain ${tab}">
@@ -175,15 +190,16 @@ function draw() {
       <div class="btools">
         ${[["#1d1d2b","黑"],["#E8505B","红"],["#2563eb","蓝"],["#16a34a","绿"]].map(([c, n]) => `<button class="sw ${ink.c === c ? "on" : ""}" style="--c:${c}" onclick="inkTool('${c}',5)">${n}</button>`).join("")}
         <button class="sw ${ink.c === "#ffffff" ? "on" : ""}" onclick="inkTool('#ffffff',36)">橡皮</button>
-        <button class="chip" onclick="inkUndo()">↶ 撤销</button><button class="chip" onclick="inkClear()">🗑 清除</button>
+        <button class="chip" onclick="inkUndo()">↶ 撤销</button><button class="chip" onclick="inkClear()">清除</button>
         <span class="muted">${curQ() ? "题目：" + esc(curQ().stem) : ""}</span>
       </div>
       <canvas id="tcv" width="1200" height="720"></canvas>
     </section>
     <aside class="tright">
       <h3>求救 ${helps.length ? `<b class="red">${helps.length}</b>` : ""}</h3>
-      ${helps.map((h) => `<div class="hrow"><span>${SEAT_ANIMALS[h.seat - 1]} ${h.seat} 号</span><button class="chip" onclick="resolveHelp(${h.seat})">处理了</button></div>`).join("") || '<p class="muted">没有人求救</p>'}
+      ${helps.map((h) => `<div class="hrow"><span>${avatar(h.seat, 24)} ${Roster.name(h.seat) || h.seat + " 号"}</span><button class="chip" onclick="resolveHelp(${h.seat})">处理了</button></div>`).join("") || '<p class="muted">没有人求救</p>'}
       <h3>座位墙 <small>灰=未进入 · 绿框=已交 · 圆点=懂不懂</small></h3>
+      ${attendHtml()}
       <div class="wall">${seatWall()}</div>
     </aside>
   </div>`;
@@ -198,6 +214,14 @@ function draw() {
   if (tab === "board") initBoard();
 }
 
+function editRoster() {
+  const cur = Roster.groups ? Roster.groups.map((g) => g.join(" ")).join("\n") : "";
+  const v = prompt("贴上班级名单：每一行是一组，名字之间用空格隔开（和 EduNeo 的排法一样）。留空＝改用座号。", cur);
+  if (v === null) return;
+  const g = Roster.parse(v);
+  Roster.set(g.length ? g : null); store.set("ol-roster", Roster.groups);
+  T.joined = {}; seen = {}; sendRoster(); publish();
+}
 function setTab(t) { tab = t; document.getElementById("app").innerHTML = ""; draw(); }
 function copyLink() {
   const link = `${location.origin}${location.pathname.replace(/teacher\.html$/, "")}?r=${room}`;
@@ -253,6 +277,7 @@ function initBoard() {
 }
 function inkUndo() { T.strokes.pop(); Room.send({ t: "inkundo" }); redrawBoard(); save(); }
 function inkClear() { T.strokes = []; Room.send({ t: "inkclear" }); redrawBoard(); save(); }
+function sendRoster() { if (Roster.groups) Room.send({ t: "roster", groups: Roster.groups }); }
 function sendInk() {
   if (!T.strokes.length) return;
   Room.send({ t: "inkfull", strokes: T.strokes.map((s) => ({ id: s.id, c: s.c, w: s.w, pts: s.pts })) });
@@ -265,8 +290,8 @@ function sendInk() {
     history.replaceState(null, "", location.pathname);
     location.reload(); return;
   }
-  Object.assign(window, { primary, jump, pickBank, toggleBoard, newRoom, resetAll, resolveHelp, setTab, copyLink, inkTool, inkUndo, inkClear });
-  Room.connect(room, onMsg, (st) => { conn = st === "SUBSCRIBED"; if (conn) publish(); else draw(); });
+  Object.assign(window, { editRoster, primary, jump, pickBank, toggleBoard, newRoom, resetAll, resolveHelp, setTab, copyLink, inkTool, inkUndo, inkClear });
+  Room.connect(room, onMsg, (st) => { conn = st === "SUBSCRIBED"; if (conn) { sendRoster(); publish(); } else draw(); });
   document.addEventListener("pointerdown", Beep.unlock, { once: true });
   document.addEventListener("keydown", (e) => { if (e.code === "Space" && tab === "run" && e.target === document.body) { e.preventDefault(); primary(); } });
   draw();
