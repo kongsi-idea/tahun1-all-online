@@ -182,18 +182,19 @@ function draw() {
   BANKS.forEach((x) => (bySubj[x.subject] = bySubj[x.subject] || []).push(x));
   const link = `${location.origin}${location.pathname.replace(/teacher\.html$/, "")}?r=${room}`;
   const helps = T.helps.slice().sort((a, b) => a.ts - b.ts);
+  document.body.classList.toggle("has-help", helps.length > 0);
   const html = `
   <header class="thead">
     <div class="rc">课堂号码 <b>${room}</b></div>
     <button class="chip" onclick="copyLink()">复制链接</button>
     <span class="chip ${conn ? "okc" : "badc"}">${conn ? "已连线" : "连线中…"} · 在线 <b>${nOnline()}</b></span>
-    ${helps.slice(0, 2).map((h) => `<button class="chip helpchip" title="点一下表示处理了" onclick="resolveHelp(${h.seat})">${avatar(h.seat, 26)}<b>${esc(Roster.name(h.seat) || h.seat + " 号")}</b> 求救</button>`).join("")}${helps.length > 2 ? `<span class="chip helpchip">+${helps.length - 2}</span>` : ""}
-    <span class="grow"></span>
+        <span class="grow"></span>
     <button class="chip ${T.board ? "okc" : ""}" onclick="toggleBoard()">${T.board ? "学生正在看板" : "让学生看板"}</button>
     <button class="chip ${tab === "run" ? "tabon" : ""}" onclick="setTab('run')">出题</button>
     <button class="chip ${tab === "board" ? "tabon" : ""}" onclick="setTab('board')">手写板</button>
     <button class="chip" onclick="editRoster()">名单</button>
     <button class="chip" onclick="resetAll()">清空</button>
+    ${helps.length ? `<div class="hbar">${helps.slice(0, 8).map((h) => `<button class="chip helpchip" title="点一下表示处理了" onclick="resolveHelp(${h.seat})">${avatar(h.seat, 26)}<b>${esc(Roster.name(h.seat) || h.seat + " 号")}</b> 求救</button>`).join("")}</div>` : ""}
   </header>
   ${Roster.groups ? "" : `<div class="nobanner">还没有班级名单，学生只能用座号进来。<button class="chip tabon" onclick="editRoster()">贴上名单</button></div>`}
   <div class="tmain mode-${tab}">

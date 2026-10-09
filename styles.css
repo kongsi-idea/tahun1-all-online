@@ -248,3 +248,7 @@ h1, h2, h3 { font-family: "ZCOOL KuaiLe", "Noto Sans SC", sans-serif; font-weigh
 
 .thead { flex-wrap: nowrap; overflow: hidden; } .thead .chip { white-space: nowrap; flex: none; } .thead .rc { white-space: nowrap; flex: none; } .thead .grow { min-width: 0; }
 .helpchip { padding: 4px 12px 4px 6px; }
+
+.thead { flex-wrap: wrap; overflow: visible; }
+.hbar { flex: 0 0 100%; display: flex; gap: 8px; flex-wrap: wrap; }
+body.has-help .tboard #tcv { width: min(100%, calc((100vh - 215px) * 5 / 3)); }
