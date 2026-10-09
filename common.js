@@ -174,7 +174,7 @@ const Beep = (() => {
   }
   function ping() { unlock(); tone(660, 0, 0.18); tone(880, 0.16, 0.18); tone(1175, 0.32, 0.3); }
   function ok() { unlock(); tone(784, 0, 0.12); tone(1047, 0.1, 0.2); }
-  function no() { unlock(); tone(300, 0, 0.25); }
+  function no() { unlock(); tone(523, 0, 0.14); }
   return { unlock, ping, ok, no };
 })();
 
@@ -197,7 +197,7 @@ const Icon = {
   clock: '<svg viewBox="0 0 24 24" width="72" height="72" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 8.5V13l3 2M9.5 2.5h5"/></svg>',
   bulb: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>'
 };
-const AV_COLORS = ["#E8505B","#3B82F6","#22A06B","#E08A1E","#7C5CE0","#0E9AA7","#C2528B","#5C7A29"];
+const AV_COLORS = ["#E8505B","#3B82F6","#22A06B","#B45309","#7C5CE0","#0B7F8A","#C2528B","#5C7A29"];
 const AV = { icons: {} };
 const AV_ICONS = ["cat","dog","bird","fish","butterfly","horse","cow","rabbit","flower-lotus","leaf","star","heart","moon","sun","rocket","airplane","bicycle","crown","lightning","ice-cream","balloon","sailboat","soccer-ball","cactus","acorn","paw-print","cookie","cloud","tree","planet","ghost","bug"];
 function iconColor(key) { const k = AV_ICONS.indexOf(key); return AV_COLORS[(k < 0 ? 0 : k) % AV_COLORS.length]; }

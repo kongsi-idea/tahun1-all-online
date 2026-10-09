@@ -35,8 +35,12 @@ const T = Object.assign({
   answers: {}, joined: {}, helps: [], lights: {}, score: {}, strokes: []
 }, store.get("ol-t-state-" + room) || {});
 AV.icons = T.icons || {};
+T.adhocQs = T.adhocQs || [];
+BANKS.push({ id: "adhoc", subject: "即兴", title: "即兴题（现场出）", questions: T.adhocQs });
 let tab = "run", conn = false, seen = {}; // seen[seat] = 最近一次收到讯息的时间
 
+const qk = () => T.bankId + ":" + T.qi;
+const ak = (i) => T.bankId + ":" + i;
 const bank = () => BANKS.find((b) => b.id === T.bankId) || BANKS[0];
 const curQ = () => (bank() && T.qi >= 0 ? bank().questions[T.qi] : null);
 const save = () => store.set("ol-t-state-" + room, T);
@@ -48,16 +52,16 @@ function qPublic(q) {
   return { type, stem, say, visual, opts };
 }
 function dist() {
-  const q = curQ(), a = T.answers[T.qi] || {}, d = {};
+  const q = curQ(), a = T.answers[qk()] || {}, d = {};
   if (!q) return d;
   Object.values(a).forEach((v) => { d[v] = (d[v] || 0) + 1; });
   return d;
 }
 function nOnline() { return Object.keys(seen).filter((s) => Date.now() - seen[s] < 50000).length; }
-function nAnswered() { return Object.keys(T.answers[T.qi] || {}).length; }
+function nAnswered() { return Object.keys(T.answers[qk()] || {}).length; }
 function publish() {
   const q = curQ();
-  const msg = { t: "state", seq: Date.now(), phase: T.phase, qi: T.qi, total: bank() ? bank().questions.length : 0, board: T.board, prog: { a: nAnswered(), n: Math.max(nOnline(), nAnswered()) } };
+  const msg = { t: "state", seq: Date.now(), phase: T.phase, bk: T.bankId, scores: T.score, asked: Object.keys(T.scored || {}).length, qi: T.qi, total: bank() ? bank().questions.length : 0, board: T.board, prog: { a: nAnswered(), n: Math.max(nOnline(), nAnswered()) } };
   if (q && T.phase !== "wait") msg.q = qPublic(q);
   if (q && T.phase === "reveal") msg.rev = { ans: q.ans, why: q.why || "", dist: dist() };
   Room.send(msg);
@@ -75,13 +79,14 @@ function pushProg() {
 /* ── 主按钮：出题 → 截止 → 公布 → 下一题 ── */
 function primary() {
   const b = bank(); if (!b) return;
-  if (T.phase === "wait") { T.qi = 0; T.phase = "q"; T.answers[0] = T.answers[0] || {}; }
+  if (T.phase === "wait") { T.qi = 0; T.phase = "q"; T.answers[qk()] = T.answers[qk()] || {}; }
   else if (T.phase === "q") T.phase = "lock";
   else if (T.phase === "lock") { T.phase = "reveal"; tally(); }
   else if (T.phase === "reveal") {
     if (T.qi + 1 >= b.questions.length) { T.phase = "wait"; T.qi = -1; }
-    else { T.qi++; T.phase = "q"; T.answers[T.qi] = {}; }
+    else { T.qi++; T.phase = "q"; T.answers[qk()] = {}; }
   }
+  if (T.phase === "q") T.board = false;
   publish();
 }
 function tally() {
@@ -89,10 +94,10 @@ function tally() {
   T.scored = T.scored || {};
   const key = T.bankId + ":" + T.qi;
   if (T.scored[key]) return; T.scored[key] = 1;
-  Object.entries(T.answers[T.qi] || {}).forEach(([s, v]) => { if (Number(v) === Number(q.ans)) T.score[s] = (T.score[s] || 0) + 1; });
+  Object.entries(T.answers[qk()] || {}).forEach(([s, v]) => { if (Number(v) === Number(q.ans)) T.score[s] = (T.score[s] || 0) + 1; });
 }
-function jump(i) { T.qi = i; T.phase = "q"; T.answers[i] = T.answers[i] || {}; publish(); }
-function pickBank(id) { T.bankId = id; T.qi = -1; T.phase = "wait"; publish(); }
+function jump(i) { T.board = false; T.qi = i; T.phase = "q"; T.answers[ak(i)] = T.answers[ak(i)] || {}; publish(); }
+function pickBank(id) { if (id === "adhoc" && !T.adhocQs.length) { adhocDlg(); return; } T.bankId = id; T.qi = -1; T.phase = "wait"; publish(); }
 function toggleBoard() { T.board = !T.board; publish(); }
 function newRoom() {
   if (!confirm("换新的课堂号码？学生要重新用新链接进来。")) return;
@@ -100,6 +105,7 @@ function newRoom() {
 }
 function resetAll() {
   if (!confirm("清空本节课的作答、求救记录和手写板？")) return;
+  T.adhocQs.length = 0;
   Object.assign(T, { qi: -1, phase: "wait", answers: {}, helps: [], lights: {}, score: {}, scored: {}, strokes: [] });
   Room.send({ t: "inkclear" }); publish();
 }
@@ -116,7 +122,7 @@ function onMsg(m) {
   } else if (m.t === "hb") {
     T.joined[s] = Date.now();
   } else if (m.t === "ans") {
-    if (m.qi === T.qi && T.phase === "q") { (T.answers[T.qi] = T.answers[T.qi] || {})[s] = m.v; pushProg(); }
+    if (m.qi === T.qi && (!m.bk || m.bk === T.bankId) && T.phase === "q") { (T.answers[qk()] = T.answers[qk()] || {})[s] = m.v; pushProg(); }
   } else if (m.t === "help") {
     if (!T.helps.some((h) => h.seat === s)) { T.helps.push({ seat: s, ts: Date.now() }); Beep.ping(); }
   } else if (m.t === "light") {
@@ -129,7 +135,7 @@ function scheduleDraw() { if (drawT) return; drawT = setTimeout(() => { drawT = 
 
 /* ── 画面 ── */
 function cellHtml(i) {
-  const a = T.answers[T.qi] || {}, q = curQ();
+  const a = T.answers[qk()] || {}, q = curQ();
   const online = seen[i] && Date.now() - seen[i] < 50000, helped = T.helps.some((h) => h.seat === i);
   const answered = a[i] !== undefined, right = q && T.phase === "reveal" && answered && Number(a[i]) === Number(q.ans);
   const cls = ["cell", T.joined[i] ? (online ? "on" : "away") : "off", answered ? "ans" : "", helped ? "help" : "", T.phase === "reveal" && answered ? (right ? "right" : "wrong") : ""].join(" ");
@@ -191,19 +197,20 @@ function draw() {
     <button class="chip" onclick="resetAll()">清空</button>
   </header>
   ${Roster.groups ? "" : `<div class="nobanner">还没有班级名单，学生只能用座号进来。<button class="chip tabon" onclick="editRoster()">贴上名单</button></div>`}
-  <div class="tmain ${tab}">
+  <div class="tmain mode-${tab}">
     <aside class="tleft">
+      <button class="bk adhocbtn" onclick="adhocDlg()">+ 即兴题</button>
       ${Object.keys(bySubj).map((s) => `<h3>${s}</h3>` + bySubj[s].map((x) => `<button class="bk ${x.id === T.bankId ? "on" : ""}" onclick="pickBank('${x.id}')">${esc(x.title)}<small>${x.questions.length} 题</small></button>`).join("")).join("") || '<p class="muted">题库没载入</p>'}
     </aside>
     <section class="tcenter" ${tab === "board" ? 'style="display:none"' : ""}>
-      <div class="qnav">${b ? b.questions.map((_, i) => `<button class="${i === T.qi ? "on" : ""} ${T.answers[i] ? "done" : ""}" onclick="jump(${i})">${i + 1}</button>`).join("") : ""}</div>
+      <div class="qnav">${b ? b.questions.map((_, i) => `<button class="${i === T.qi ? "on" : ""} ${T.answers[ak(i)] ? "done" : ""}" onclick="jump(${i})">${i + 1}</button>`).join("") : ""}</div>
       ${preview()}
       <div class="tstats"><div class="tstat-h">已交 <b>${nAnswered()}</b> / ${Math.max(nOnline(), nAnswered())}</div>${statsHtml()}</div>
-      <button class="primary ${T.phase}" onclick="primary()">${PRI[T.phase]}</button>
+      <div class="pbar"><button class="primary ${T.phase}" onclick="primary()">${PRI[T.phase]}</button></div>
     </section>
     <section class="tboard" ${tab === "board" ? "" : 'style="display:none"'}>
       <div class="btools">
-        ${[["#1d1d2b","黑"],["#E8505B","红"],["#2563eb","蓝"],["#16a34a","绿"]].map(([c, n]) => `<button class="sw ${ink.c === c ? "on" : ""}" style="--c:${c}" onclick="inkTool('${c}',5)">${n}</button>`).join("")}
+        ${[["#1d1d2b","黑"],["#E8505B","红"],["#2563eb","蓝"],["#16a34a","绿"]].map(([c, n]) => `<button class="sw ${ink.c === c ? "on" : ""}" style="--c:${c}" onclick="inkTool('${c}',8)">${n}</button>`).join("")}
         <button class="sw ${ink.c === "#ffffff" ? "on" : ""}" onclick="inkTool('#ffffff',36)">橡皮</button>
         <button id="touchbtn" class="chip ${ink.touchOk ? "okc" : ""}" onclick="toggleTouch()">${ink.touchOk ? "手指也能写：开" : "只用笔写（防手掌）"}</button>
         <button class="chip" onclick="inkUndo()">↶ 撤销</button><button class="chip" onclick="inkClear()">清除</button>
@@ -246,6 +253,39 @@ function editRoster() {
     T.joined = {}; seen = {}; m.remove(); sendRoster(); publish();
   };
 }
+
+function adhocDlg() {
+  const st = { type: "num", n: 3, ans: null };
+  const m = document.createElement("div"); m.className = "modal";
+  const letters = "ABCD";
+  const paint = () => {
+    const seg = (k, v, label) => `<button class="chip ${st[k] === v ? "tabon" : ""}" data-k="${k}" data-v="${v}">${label}</button>`;
+    m.innerHTML = `<div class="mbox"><h2>即兴题</h2><p class="muted">你口头或在手写板上出题，这里只设定学生怎么答、正确答案是什么。</p>
+      <div class="seg">${seg("type", "num", "数字答案")}${seg("type", "choice", "选择 A B C")}</div>
+      ${st.type === "choice"
+        ? `<div class="seg"><span>选项数</span>${[2, 3, 4].map((n) => seg("n", n, n)).join("")}</div>
+           <div class="seg"><span>正确答案</span>${letters.slice(0, st.n).split("").map((L, i) => seg("ans", i, L)).join("")}</div>`
+        : `<div class="seg"><span>正确答案</span><input id="adn" inputmode="numeric" maxlength="4" value="${st.ans === null ? "" : st.ans}" placeholder="数字"></div>`}
+      <div class="mrow"><button class="chip" id="ac">取消</button><button class="chip tabon" id="ao">出题</button></div></div>`;
+    m.querySelectorAll("[data-k]").forEach((b) => (b.onclick = () => {
+      const keepNum = m.querySelector("#adn"); if (keepNum) st.ans = keepNum.value === "" ? null : Number(keepNum.value);
+      const k = b.dataset.k, v = b.dataset.v; st[k] = k === "type" ? v : Number(v);
+      if (k === "type") st.ans = null; if (k === "n" && st.ans >= st.n) st.ans = null; paint();
+    }));
+    m.querySelector("#ac").onclick = () => m.remove();
+    m.querySelector("#ao").onclick = () => {
+      let ans = st.ans;
+      if (st.type === "num") { const el = m.querySelector("#adn"); ans = el && el.value !== "" ? Number(el.value) : null; }
+      if (ans === null || Number.isNaN(ans)) { alert("请先填正确答案"); return; }
+      const q = st.type === "num"
+        ? { type: "num", stem: "看老师出的题，写出答案", ans, ref: "即兴题" }
+        : { type: "choice", stem: "看老师出的题，选一个答案", opts: letters.slice(0, st.n).split(""), ans, ref: "即兴题" };
+      T.board = false; T.adhocQs.push(q); T.bankId = "adhoc"; T.qi = T.adhocQs.length - 1; T.phase = "q"; T.answers[qk()] = {};
+      m.remove(); publish();
+    };
+  };
+  document.body.appendChild(m); paint();
+}
 function setTab(t) { tab = t; document.getElementById("app").innerHTML = ""; draw(); }
 function copyLink() {
   const link = `${location.origin}${location.pathname.replace(/teacher\.html$/, "")}?r=${room}`;
@@ -253,7 +293,7 @@ function copyLink() {
 }
 
 /* ── 手写板 ── */
-const ink = { c: "#1d1d2b", w: 5, cur: null, pending: [], timer: null, touchOk: store.get("ol-touchok") === true };
+const ink = { c: "#1d1d2b", w: 8, cur: null, pending: [], timer: null, touchOk: store.get("ol-touchok") === true };
 function inkTool(c, w) { ink.c = c; ink.w = w; document.querySelectorAll(".sw").forEach((b) => b.classList.remove("on")); draw(); }
 function redrawBoard() {
   const cv = document.getElementById("tcv"); if (!cv) return;
@@ -318,9 +358,10 @@ function sendInk() {
     history.replaceState(null, "", location.pathname);
     location.reload(); return;
   }
-  Object.assign(window, { toggleTouch, editRoster, primary, jump, pickBank, toggleBoard, newRoom, resetAll, resolveHelp, setTab, copyLink, inkTool, inkUndo, inkClear });
+  Object.assign(window, { adhocDlg, toggleTouch, editRoster, primary, jump, pickBank, toggleBoard, newRoom, resetAll, resolveHelp, setTab, copyLink, inkTool, inkUndo, inkClear });
   Room.connect(room, onMsg, (st) => { conn = st === "SUBSCRIBED"; if (conn) { sendRoster(); publish(); } else draw(); });
   document.addEventListener("pointerdown", Beep.unlock, { once: true });
+  document.addEventListener("touchstart", () => {}, { passive: true });
   ["selectstart", "contextmenu", "gesturestart"].forEach((ev) => document.addEventListener(ev, (e) => { if (tab === "board") e.preventDefault(); }));
   document.addEventListener("keydown", (e) => { if (e.code === "Space" && tab === "run" && e.target === document.body) { e.preventDefault(); primary(); } });
   draw();

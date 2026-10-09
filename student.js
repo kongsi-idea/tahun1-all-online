@@ -45,11 +45,11 @@ function onMsg(m) {
   if (m.t === "state") {
     if (m.seq < S.stateAt) return;
     const newQ = m.phase === "q" && (m.qi !== S.qi || m.seq !== S.stateAt) && S.phase !== "q";
-    const changedQ = m.qi !== S.qi;
+    const changedQ = (m.bk + ":" + m.qi) !== S.qk;
     S.stateAt = m.seq;
     S.phase = m.phase; S.total = m.total; S.board = !!m.board;
     if (changedQ) { S.sel = null; S.numBuf = ""; }
-    S.qi = m.qi; persist(); S.q = m.q || null; S.rev = m.rev || null; S.prog = m.prog || S.prog;
+    S.qi = m.qi; S.qk = m.bk + ":" + m.qi; S.bk = m.bk; S.scores = m.scores || S.scores; S.asked = m.asked || 0; persist(); S.q = m.q || null; S.rev = m.rev || null; S.prog = m.prog || S.prog;
     if (m.phase === "q" && (changedQ || newQ)) { Beep.ping(); flashTitle(); }
     if (m.phase === "reveal" && S.rev) {
       const mine = myAnswer();
@@ -74,7 +74,7 @@ function onMsg(m) {
   }
 }
 
-function persist() { store.set("ol-a-" + S.room, JSON.stringify({ qi: S.qi, sel: S.sel, numBuf: S.numBuf, light: S.light, submitted: S.submitted })); }
+function persist() { store.set("ol-a-" + S.room, JSON.stringify({ qi: S.qi, qk: S.qk, sel: S.sel, numBuf: S.numBuf, light: S.light, submitted: S.submitted })); }
 function myAnswer() {
   if (!S.q) return null;
   if (S.q.type === "num") return S.numBuf === "" ? null : Number(S.numBuf);
@@ -95,7 +95,7 @@ function inkRedraw() {
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   S.ink.strokes.forEach((s) => {
-    ctx.strokeStyle = s.c; ctx.lineWidth = s.w;
+    ctx.strokeStyle = s.c; ctx.lineWidth = Math.max(s.w, 2.5 * cv.width / (cv.clientWidth || cv.width));
     ctx.beginPath();
     s.pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
     if (s.pts.length === 1) ctx.lineTo(s.pts[0][0] + 0.1, s.pts[0][1]);
@@ -107,7 +107,7 @@ function inkRedraw() {
 function sendAns() {
   const v = myAnswer();
   if (v === null || !S.q) return;
-  Room.send({ t: "ans", seat: S.seat, qi: S.qi, v });
+  Room.send({ t: "ans", seat: S.seat, qi: S.qi, bk: S.bk, v });
 }
 function pickOpt(i) {
   if (S.phase !== "q") return;
@@ -116,12 +116,12 @@ function pickOpt(i) {
 function key(k) {
   if (S.phase !== "q") return;
   if (k === "del") S.numBuf = S.numBuf.slice(0, -1);
-  else if (S.numBuf.length < 2) S.numBuf += String(k);
+  else if (S.numBuf.length < 4) S.numBuf += String(k);
   persist(); render();
 }
 function submitNum() {
   if (S.phase !== "q" || S.numBuf === "") return;
-  sendAns(); S.submitted = S.qi; persist(); render();
+  sendAns(); S.submitted = S.qk; persist(); render();
 }
 function help() {
   if (Date.now() < S.helpUntil) return;
@@ -168,14 +168,14 @@ function answerArea() {
   if (q.type === "choice") {
     return `<div class="opts n${q.opts.length}">${q.opts.map((o, i) => {
       const os = OPT_STYLE[i], txt = typeof o === "string" ? o : o.t, vis = typeof o === "string" ? "" : Vis.render(o.visual);
-      return `<button class="opt ${S.sel === i ? "sel" : ""}" style="--c:${os.color}" onclick="pickOpt(${i})"><span class="mk">${os.shape}</span><span class="ot">${vis}${txt ? h(txt) : ""}</span></button>`;
+      return `<button class="opt ${S.sel === i ? "sel" : ""}" style="--c:${os.color};--fg:${i === 3 ? "#3B2A00" : "#fff"}" onclick="pickOpt(${i})"><span class="mk">${os.shape}</span><span class="ot">${vis}${txt ? h(txt) : ""}</span></button>`;
     }).join("")}</div>
     <p class="hint">${S.sel === null ? "点一个答案" : "已选好了 ✓　想改可以再点别的"}</p>`;
   }
-  const done = S.submitted === S.qi;
+  const done = S.submitted === S.qk;
   return `<div class="numwrap"><div class="numshow ${done ? "done" : ""}">${S.numBuf === "" ? "?" : h(S.numBuf)}</div>
-    <div class="keypad">${[1,2,3,4,5,6,7,8,9].map((k) => `<button onclick="key(${k})">${k}</button>`).join("")}
-      <button class="k-del" onclick="key('del')">⌫</button><button onclick="key(0)">0</button><button class="k-ok" onclick="submitNum()">✔</button></div></div>
+    <div class="keypad">${[1,2,3,4,5,6,7,8,9,0].map((k) => `<button onclick="key(${k})">${k}</button>`).join("")}
+      <button class="k-del" onclick="key('del')" aria-label="删掉一个">⌫</button><button class="k-ok" onclick="submitNum()">✔ 交出</button></div></div>
     <p class="hint">${done ? "已交出 ✓　想改就改，再按 ✔" : "先在纸上算，再按数字，最后按 ✔"}</p>`;
 }
 function boardHtml() {
@@ -190,9 +190,9 @@ function revealHtml() {
     return `<div class="drow ${Number(k) === Number(r.ans) ? "ok" : ""}"><span>${h(label)}</span><i style="width:${Math.max(6, Math.round((n / tot) * 100))}%"></i><b>${n}</b></div>`;
   }).join("");
   const verdict = mine === null ? `<div class="res none">这题你还没答 · 没关系，看看答案</div>`
-    : isRight() ? `<div class="res good">答对了！</div>` : `<div class="res bad">差一点点 · 看看正确答案</div>`;
+    : isRight() ? `<div class="res good">答对了！</div>` : `<div class="res bad">再看一看</div>`;
   return `${verdict}
-    <div class="answer">正确答案：<b>${rightTxt}</b></div>
+    <div class="answer">正确答案：<b style="color:${q.type === "choice" ? OPT_STYLE[r.ans].color : "var(--leaf)"}">${rightTxt}</b></div>
     ${r.why ? `<p class="why"><span class="bulb">${Icon.bulb}</span>${h(r.why)}</p>` : ""}
     <div class="dist"><small>全班怎么选</small>${rows}</div>`;
 }
@@ -217,7 +217,10 @@ function render() {
   } else if (S.phase === "reveal") {
     body = questionHtml() + revealHtml();
   }
-  $app.innerHTML = topbar() + `<div class="stage">${body}</div>`;
+  const mine = (S.scores && S.scores[S.seat]) || 0, bump = mine > (S.lastScore || 0);
+  S.lastScore = mine;
+  const sb = S.asked ? `<div class="scorebar ${bump ? "bump" : ""}"><i class="ph-fill ph-star"></i>今天答对 <b>${mine}</b> 题 <small>/ 共 ${S.asked} 题</small></div>` : "";
+  $app.innerHTML = topbar() + `<div class="stage">${sb}${body}</div>`;
   if (Date.now() < S.helpUntil) tickHelp();
 }
 
@@ -257,8 +260,9 @@ function setSeat(i) {
   window.submitNum = submitNum; window.help = help; window.setLight = setLight;
   if (S.room) { store.set("ol-room", S.room); S.seat = Number(store.get("ol-seat-" + S.room)) || 0;
     { const ic = store.get("ol-icon-" + S.room + "-" + S.seat); if (ic) AV.icons[S.seat] = ic; }
-    try { const a = JSON.parse(store.get("ol-a-" + S.room) || "null"); if (a) { S.qi = a.qi; S.sel = a.sel; S.numBuf = a.numBuf || ""; S.light = a.light || ""; S.submitted = a.submitted; } } catch (e) {} }
+    try { const a = JSON.parse(store.get("ol-a-" + S.room) || "null"); if (a) { S.qi = a.qi; S.qk = a.qk; S.sel = a.sel; S.numBuf = a.numBuf || ""; S.light = a.light || ""; S.submitted = a.submitted; } } catch (e) {} }
   render();
   if (S.room) startRoom();
   document.addEventListener("pointerdown", Beep.unlock, { once: true });
+  document.addEventListener("touchstart", () => {}, { passive: true });
 })();
