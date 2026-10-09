@@ -176,6 +176,7 @@ function draw() {
     <button class="chip" onclick="editRoster()">名单</button>
     <button class="chip" onclick="resetAll()">清空</button>
   </header>
+  ${Roster.groups ? "" : `<div class="nobanner">还没有班级名单，学生只能用座号进来。<button class="chip tabon" onclick="editRoster()">贴上名单</button></div>`}
   <div class="tmain ${tab}">
     <aside class="tleft">
       ${Object.keys(bySubj).map((s) => `<h3>${s}</h3>` + bySubj[s].map((x) => `<button class="bk ${x.id === T.bankId ? "on" : ""}" onclick="pickBank('${x.id}')">${esc(x.title)}<small>${x.questions.length} 题</small></button>`).join("")).join("") || '<p class="muted">题库没载入</p>'}
@@ -217,11 +218,19 @@ function draw() {
 
 function editRoster() {
   const cur = Roster.groups ? Roster.groups.map((g) => g.join(" ")).join("\n") : "";
-  const v = prompt("贴上班级名单：每一行是一组，名字之间用空格隔开（和 EduNeo 的排法一样）。留空＝改用座号。", cur);
-  if (v === null) return;
-  const g = Roster.parse(v);
-  Roster.set(g.length ? g : null); store.set("ol-roster", Roster.groups);
-  T.joined = {}; seen = {}; sendRoster(); publish();
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="mbox"><h2>班级名单</h2><p class="muted">每一行是一组，名字之间用空格隔开（和 EduNeo 的排法一样）。留空＝改用座号。<br>只存在这台 iPad 的浏览器里，不会上传到服务器。</p>
+    <textarea id="rtext" rows="9" spellcheck="false" placeholder="刘伊祎 黄凯轩 马颖婕 赖军暐 吴钫嗪&#10;郭瑞杰 张恩珣 谢佳宸 刘乐蒽 许志安">${esc(cur)}</textarea>
+    <div class="mrow"><button class="chip" id="rcancel">取消</button><button class="chip tabon" id="rsave">保存</button></div></div>`;
+  document.body.appendChild(m);
+  const ta = m.querySelector("#rtext"); ta.focus();
+  m.querySelector("#rcancel").onclick = () => m.remove();
+  m.querySelector("#rsave").onclick = () => {
+    let g = Roster.parse(ta.value);
+    if (g.length === 1 && g[0].length > 5) { const all = g[0]; g = []; for (let i = 0; i < all.length; i += 5) g.push(all.slice(i, i + 5)); } // 整份贴成一行时，每 5 人一组
+    Roster.set(g.length ? g : null); store.set("ol-roster", Roster.groups);
+    T.joined = {}; seen = {}; m.remove(); sendRoster(); publish();
+  };
 }
 function setTab(t) { tab = t; document.getElementById("app").innerHTML = ""; draw(); }
 function copyLink() {
