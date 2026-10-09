@@ -22,7 +22,7 @@ let room = store.get("ol-t-room");
     if (p.get("roster")) {
       const bin = atob(p.get("roster").replace(/-/g, "+").replace(/_/g, "/"));
       const txt = new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
-      const g = Roster.parse(txt); if (g.length) store.set("ol-roster", g);
+      const g = Roster.parse(txt); if (g.length) { store.set("ol-roster", g); Roster.set(g); }
     }
   } catch (e) {}
   if (p.get("r") || p.get("roster")) history.replaceState(null, "", location.pathname);
