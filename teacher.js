@@ -12,7 +12,22 @@ const SEATS_DEFAULT = 40;
 Roster.set(store.get("ol-roster"));
 const seatCount = () => Roster.count() || SEATS_DEFAULT;
 
-let room = store.get("ol-t-room") || String(Math.floor(1000 + Math.random() * 9000));
+/* 老师专用链接可带 #r=房号&roster=名单(base64)：读进本机后立刻从网址抹掉，名单不进源码、不上传服务器 */
+let room = store.get("ol-t-room");
+(function readHash() {
+  if (location.hash.length < 2) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  try {
+    if (p.get("r")) room = p.get("r").replace(/\D/g, "").slice(0, 8);
+    if (p.get("roster")) {
+      const bin = atob(p.get("roster").replace(/-/g, "+").replace(/_/g, "/"));
+      const txt = new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+      const g = Roster.parse(txt); if (g.length) store.set("ol-roster", g);
+    }
+  } catch (e) {}
+  if (p.get("r") || p.get("roster")) history.replaceState(null, "", location.pathname);
+})();
+if (!room) room = String(Math.floor(100000 + Math.random() * 900000));
 store.set("ol-t-room", room);
 
 const T = Object.assign({
@@ -300,7 +315,7 @@ function sendInk() {
 /* ── 启动 ── */
 (function init() {
   if (new URLSearchParams(location.search).get("new")) {
-    room = String(Math.floor(1000 + Math.random() * 9000)); store.set("ol-t-room", room);
+    room = String(Math.floor(100000 + Math.random() * 900000)); store.set("ol-t-room", room);
     history.replaceState(null, "", location.pathname);
     location.reload(); return;
   }

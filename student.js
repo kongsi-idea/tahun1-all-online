@@ -11,7 +11,7 @@ const store = {
 };
 
 const S = {
-  room: (qs.get("r") || store.get("ol-room") || "").replace(/\D/g, "").slice(0, 4),
+  room: (qs.get("r") || store.get("ol-room") || "").replace(/\D/g, "").slice(0, 8),
   seat: 0,
   phase: "wait", qi: -1, total: 0, q: null, rev: null, board: false, prog: { a: 0, n: 0 },
   sel: null, numBuf: "", stateAt: 0,
@@ -222,26 +222,20 @@ function render() {
 }
 
 function renderRoom() {
-  $app.innerHTML = `<div class="stage center"><section class="join"><h1>输入课堂号码</h1><p>老师在 Meet 聊天室给了 4 个数字</p>
-    <input id="rc" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000"><button class="go" onclick="setRoom()">进入</button></section></div>`;
+  $app.innerHTML = `<div class="stage center"><section class="join"><div class="dots"><i></i><i></i><i></i></div><h1>请用老师给的链接进来</h1><p>在 Meet 聊天室点老师发的那个链接就可以了，不用输入号码</p></section></div>`;
 }
-function setRoom() {
-  const v = (document.getElementById("rc").value || "").replace(/\D/g, "");
-  if (v.length !== 4) return;
-  S.room = v; store.set("ol-room", v); render(); startRoom();
-}
+function setRoom() {}
 function renderSeat() {
-  let g = "";
-  if (Roster.groups) {
-    Roster.groups.forEach((grp, gi) => {
-      const st = Roster.startOf(gi);
-      g += `<div class="sg"><small>第 ${gi + 1} 组</small><div class="sgrow">${grp.map((nm, k) => `<button onclick="setSeat(${st + k + 1})">${avatar(st + k + 1, 38)}<b>${h(nm)}</b></button>`).join("")}</div></div>`;
-    });
-    $app.innerHTML = `<div class="stage center"><section class="join"><h1>你是谁？</h1><p>点你的名字</p>${g}</section></div>`;
+  if (!Roster.groups) {
+    $app.innerHTML = `<div class="stage center"><section class="join"><div class="dots"><i></i><i></i><i></i></div><h1>等老师准备好</h1><p>老师还在准备名单，马上就好</p></section></div>`;
     return;
   }
-  for (let i = 1; i <= 40; i++) g += `<button onclick="setSeat(${i})">${avatar(i, 34)}<b>${i}</b></button>`;
-  $app.innerHTML = `<div class="stage center"><section class="join"><h1>你是几号？</h1><p>点你的座号</p><div class="seatgrid">${g}</div></section></div>`;
+  let g = "";
+  Roster.groups.forEach((grp, gi) => {
+    const st = Roster.startOf(gi);
+    g += `<div class="sg"><small>第 ${gi + 1} 组</small><div class="sgrow">${grp.map((nm, k) => `<button onclick="setSeat(${st + k + 1})">${avatar(st + k + 1, 38)}<b>${h(nm)}</b></button>`).join("")}</div></div>`;
+  });
+  $app.innerHTML = `<div class="stage center"><section class="join"><h1>你是谁？</h1><p>点你的名字</p>${g}</section></div>`;
 }
 function renderIcon() {
   $app.innerHTML = `<div class="stage center"><section class="join"><h1>选你的小图标</h1><p>${Roster.name(S.seat) ? h(Roster.name(S.seat)) + "，" : ""}点一个喜欢的</p>
