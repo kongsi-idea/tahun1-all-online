@@ -190,6 +190,7 @@ function draw() {
       <div class="btools">
         ${[["#1d1d2b","黑"],["#E8505B","红"],["#2563eb","蓝"],["#16a34a","绿"]].map(([c, n]) => `<button class="sw ${ink.c === c ? "on" : ""}" style="--c:${c}" onclick="inkTool('${c}',5)">${n}</button>`).join("")}
         <button class="sw ${ink.c === "#ffffff" ? "on" : ""}" onclick="inkTool('#ffffff',36)">橡皮</button>
+        <button class="chip ${ink.touchOk ? "okc" : ""}" onclick="toggleTouch()">${ink.touchOk ? "手指也能写：开" : "只用笔写（防手掌）"}</button>
         <button class="chip" onclick="inkUndo()">↶ 撤销</button><button class="chip" onclick="inkClear()">清除</button>
         <span class="muted">${curQ() ? "题目：" + esc(curQ().stem) : ""}</span>
       </div>
@@ -229,7 +230,7 @@ function copyLink() {
 }
 
 /* ── 手写板 ── */
-const ink = { c: "#1d1d2b", w: 5, cur: null, pending: [], timer: null, penSeen: false };
+const ink = { c: "#1d1d2b", w: 5, cur: null, pending: [], timer: null, touchOk: store.get("ol-touchok") === true };
 function inkTool(c, w) { ink.c = c; ink.w = w; document.querySelectorAll(".sw").forEach((b) => b.classList.remove("on")); draw(); }
 function redrawBoard() {
   const cv = document.getElementById("tcv"); if (!cv) return;
@@ -253,8 +254,7 @@ function initBoard() {
   const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.round((e.clientX - r.left) * cv.width / r.width), Math.round((e.clientY - r.top) * cv.height / r.height)]; };
   cv.style.touchAction = "none";
   cv.onpointerdown = (e) => {
-    if (e.pointerType === "pen") ink.penSeen = true;
-    if (e.pointerType === "touch" && ink.penSeen) return; // 手掌误触不画
+    if (e.pointerType === "touch" && !ink.touchOk) return; // 预设只认 Apple Pencil／鼠标，手掌与手指不画
     cv.setPointerCapture(e.pointerId);
     const p = pos(e);
     ink.cur = { id: Date.now() + "-" + Math.random().toString(36).slice(2, 6), c: ink.c, w: ink.w, pts: [p] };
@@ -275,6 +275,7 @@ function initBoard() {
   const up = () => { if (!ink.cur) return; clearInterval(ink.timer); flushInk(true); ink.cur = null; save(); };
   cv.onpointerup = up; cv.onpointercancel = up;
 }
+function toggleTouch() { ink.touchOk = !ink.touchOk; store.set("ol-touchok", ink.touchOk); draw(); }
 function inkUndo() { T.strokes.pop(); Room.send({ t: "inkundo" }); redrawBoard(); save(); }
 function inkClear() { T.strokes = []; Room.send({ t: "inkclear" }); redrawBoard(); save(); }
 function sendRoster() { if (Roster.groups) Room.send({ t: "roster", groups: Roster.groups }); }
@@ -290,9 +291,10 @@ function sendInk() {
     history.replaceState(null, "", location.pathname);
     location.reload(); return;
   }
-  Object.assign(window, { editRoster, primary, jump, pickBank, toggleBoard, newRoom, resetAll, resolveHelp, setTab, copyLink, inkTool, inkUndo, inkClear });
+  Object.assign(window, { toggleTouch, editRoster, primary, jump, pickBank, toggleBoard, newRoom, resetAll, resolveHelp, setTab, copyLink, inkTool, inkUndo, inkClear });
   Room.connect(room, onMsg, (st) => { conn = st === "SUBSCRIBED"; if (conn) { sendRoster(); publish(); } else draw(); });
   document.addEventListener("pointerdown", Beep.unlock, { once: true });
+  ["selectstart", "contextmenu", "gesturestart"].forEach((ev) => document.addEventListener(ev, (e) => { if (tab === "board") e.preventDefault(); }));
   document.addEventListener("keydown", (e) => { if (e.code === "Space" && tab === "run" && e.target === document.body) { e.preventDefault(); primary(); } });
   draw();
   setInterval(() => { if (tab === "run") draw(); }, 5000); // 在线状态定时刷新
