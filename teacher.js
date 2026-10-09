@@ -61,7 +61,7 @@ function nOnline() { return Object.keys(seen).filter((s) => Date.now() - seen[s]
 function nAnswered() { return Object.keys(T.answers[qk()] || {}).length; }
 function publish() {
   const q = curQ();
-  const msg = { t: "state", seq: Date.now(), phase: T.phase, bk: T.bankId, scores: T.score, asked: Object.keys(T.scored || {}).length, qi: T.qi, total: bank() ? bank().questions.length : 0, board: T.board, prog: { a: nAnswered(), n: Math.max(nOnline(), nAnswered()) } };
+  const msg = { t: "state", seq: Date.now(), phase: T.phase, taken: Object.keys(seen).filter((s) => Date.now() - seen[s] < 50000).map(Number), bk: T.bankId, scores: T.score, asked: Object.keys(T.scored || {}).length, qi: T.qi, total: bank() ? bank().questions.length : 0, board: T.board, prog: { a: nAnswered(), n: Math.max(nOnline(), nAnswered()) } };
   if (q && T.phase !== "wait") msg.q = qPublic(q);
   if (q && T.phase === "reveal") msg.rev = { ans: q.ans, why: q.why || "", dist: dist() };
   Room.send(msg);
@@ -109,6 +109,14 @@ function resetAll() {
   Object.assign(T, { qi: -1, phase: "wait", answers: {}, helps: [], lights: {}, score: {}, scored: {}, strokes: [] });
   Room.send({ t: "inkclear" }); publish();
 }
+function cellClick(i) {
+  if (T.helps.some((h) => h.seat === i)) { resolveHelp(i); return; }
+  if (!T.joined[i]) return;
+  if (!confirm("让「" + (Roster.name(i) || i + " 号") + "」重新选名字？\n（他的画面会回到选名字页）")) return;
+  Room.send({ t: "reset", seat: i });
+  delete T.joined[i]; delete seen[i]; const a = T.answers[qk()]; if (a) delete a[i];
+  publish();
+}
 function resolveHelp(seat) { T.helps = T.helps.filter((h) => h.seat !== seat); save(); draw(); }
 
 /* ── 收到学生讯息 ── */
@@ -119,6 +127,9 @@ function onMsg(m) {
   if (m.t === "join" || m.t === "hello") {
     if (s) T.joined[s] = Date.now();
     if (!onMsg.rt) onMsg.rt = setTimeout(() => { onMsg.rt = null; sendRoster(); publish(); sendInk(); }, 600); // 不重置计时，免得连续刷新的人被饿死
+  } else if (m.t === "leave") {
+    delete T.joined[s]; delete seen[s]; const a = T.answers[qk()]; if (a) delete a[s];
+    clearTimeout(onMsg.lt); onMsg.lt = setTimeout(publish, 400);
   } else if (m.t === "hb") {
     T.joined[s] = Date.now();
   } else if (m.t === "ans") {
@@ -141,7 +152,7 @@ function cellHtml(i) {
   const cls = ["cell", T.joined[i] ? (online ? "on" : "away") : "off", answered ? "ans" : "", helped ? "help" : "", T.phase === "reveal" && answered ? (right ? "right" : "wrong") : ""].join(" ");
   const lt = T.lights[i] ? `<i class="dot ${T.lights[i]}"></i>` : "";
   const nm = Roster.name(i);
-  return `<button class="${cls}" onclick="resolveHelp(${i})" title="${nm || i + " 号"}">${avatar(i, 24)}<b>${nm ? esc(nm) : i}</b>${lt}${T.score[i] ? `<em>${T.score[i]}</em>` : ""}</button>`;
+  return `<button class="${cls}" onclick="cellClick(${i})" title="${nm || i + " 号"}">${avatar(i, 24)}<b>${nm ? esc(nm) : i}</b>${lt}${T.score[i] ? `<em>${T.score[i]}</em>` : ""}</button>`;
 }
 function seatWall() {
   if (Roster.groups) {
@@ -356,7 +367,7 @@ function sendInk() {
     history.replaceState(null, "", location.pathname);
     location.reload(); return;
   }
-  Object.assign(window, { adhocDlg, toggleTouch, editRoster, primary, jump, pickBank, toggleBoard, newRoom, resetAll, resolveHelp, setTab, copyLink, inkTool, inkUndo, inkClear });
+  Object.assign(window, { cellClick, adhocDlg, toggleTouch, editRoster, primary, jump, pickBank, toggleBoard, newRoom, resetAll, resolveHelp, setTab, copyLink, inkTool, inkUndo, inkClear });
   Room.connect(room, onMsg, (st) => { conn = st === "SUBSCRIBED"; if (conn) { sendRoster(); publish(); } else draw(); });
   document.addEventListener("pointerdown", Beep.unlock, { once: true });
   document.addEventListener("touchstart", () => {}, { passive: true });

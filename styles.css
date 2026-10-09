@@ -252,3 +252,6 @@ h1, h2, h3 { font-family: "ZCOOL KuaiLe", "Noto Sans SC", sans-serif; font-weigh
 .thead { flex-wrap: wrap; overflow: visible; }
 .hbar { flex: 0 0 100%; display: flex; gap: 8px; flex-wrap: wrap; }
 body.has-help .tboard #tcv { width: min(100%, calc((100vh - 215px) * 5 / 3)); }
+
+.linkbtn { display: block; margin: 6px auto 0; padding: 8px 14px; background: none; border: 0; color: #1D4ED8; font-weight: 700; font-size: 17px; text-decoration: underline; }
+.sgrow button.taken { opacity: .5; border-style: dashed; } .sgrow button.taken b::after { content: "（有人）"; font-size: 11px; color: var(--mute); }

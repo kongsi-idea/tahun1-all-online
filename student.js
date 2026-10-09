@@ -49,7 +49,7 @@ function onMsg(m) {
     S.stateAt = m.seq;
     S.phase = m.phase; S.total = m.total; S.board = !!m.board;
     if (changedQ) { S.sel = null; S.numBuf = ""; }
-    S.qi = m.qi; S.qk = m.bk + ":" + m.qi; S.bk = m.bk; S.scores = m.scores || S.scores; S.asked = m.asked || 0; persist(); S.q = m.q || null; S.rev = m.rev || null; S.prog = m.prog || S.prog;
+    S.qi = m.qi; S.qk = m.bk + ":" + m.qi; S.bk = m.bk; S.taken = m.taken || []; S.scores = m.scores || S.scores; S.asked = m.asked || 0; persist(); S.q = m.q || null; S.rev = m.rev || null; S.prog = m.prog || S.prog;
     if (m.phase === "q" && (changedQ || newQ)) { Beep.ping(); flashTitle(); }
     if (m.phase === "reveal" && S.rev) {
       const mine = myAnswer();
@@ -57,6 +57,8 @@ function onMsg(m) {
     }
     if (S.needResend && m.phase === "q") { S.needResend = false; if (myAnswer() !== null) sendAns(); }
     render();
+  } else if (m.t === "reset") {
+    if (m.seat === S.seat) changeName(false);
   } else if (m.t === "roster") {
     Roster.set(m.groups); if (!S.seat || S.seat) render();
   } else if (m.t === "prog") {
@@ -236,13 +238,23 @@ function renderSeat() {
   let g = "";
   Roster.groups.forEach((grp, gi) => {
     const st = Roster.startOf(gi);
-    g += `<div class="sg"><small>第 ${gi + 1} 组</small><div class="sgrow">${grp.map((nm, k) => `<button onclick="setSeat(${st + k + 1})">${avatar(st + k + 1, 38)}<b>${h(nm)}</b></button>`).join("")}</div></div>`;
+    g += `<div class="sg"><small>第 ${gi + 1} 组</small><div class="sgrow">${grp.map((nm, k) => `<button class="${(S.taken || []).includes(st + k + 1) ? "taken" : ""}" onclick="pickName(${st + k + 1})">${avatar(st + k + 1, 38)}<b>${h(nm)}</b></button>`).join("")}</div></div>`;
   });
   $app.innerHTML = `<div class="stage center"><section class="join"><h1>你是谁？</h1><p>点你的名字</p>${g}</section></div>`;
 }
 function renderIcon() {
   $app.innerHTML = `<div class="stage center"><section class="join"><h1>选你的小图标</h1><p>${Roster.name(S.seat) ? h(Roster.name(S.seat)) + "，" : ""}点一个喜欢的</p>
+    <button class="linkbtn" onclick="changeName()">不是我？重新选名字</button>
     <div class="icongrid">${AV_ICONS.map((k) => `<button style="--c:${iconColor(k)}" onclick="setIcon('${k}')" aria-label="${k}"><i class="ph-fill ph-${k}"></i></button>`).join("")}</div></section></div>`;
+}
+function changeName(notify) {
+  if (notify !== false && S.seat) Room.send({ t: "leave", seat: S.seat });
+  store.set("ol-seat-" + S.room, ""); S.seat = 0; S.picking = false; S.sel = null; S.numBuf = ""; S.light = ""; S.submitted = null;
+  persist(); render();
+}
+function pickName(i) {
+  if ((S.taken || []).includes(i) && !confirm("这个名字已经有人在用了。\n你确定你是 " + Roster.name(i) + " 吗？")) return;
+  setSeat(i);
 }
 function pickIcon() { S.picking = true; render(); }
 function setIcon(k) {
@@ -256,7 +268,7 @@ function setSeat(i) {
 }
 
 (function init() {
-  window.setIcon = setIcon; window.pickIcon = pickIcon; window.setRoom = setRoom; window.setSeat = setSeat; window.pickOpt = pickOpt; window.key = key;
+  window.changeName = changeName; window.pickName = pickName; window.setIcon = setIcon; window.pickIcon = pickIcon; window.setRoom = setRoom; window.setSeat = setSeat; window.pickOpt = pickOpt; window.key = key;
   window.submitNum = submitNum; window.help = help; window.setLight = setLight;
   if (S.room) { store.set("ol-room", S.room); S.seat = Number(store.get("ol-seat-" + S.room)) || 0;
     { const ic = store.get("ol-icon-" + S.room + "-" + S.seat); if (ic) AV.icons[S.seat] = ic; }
