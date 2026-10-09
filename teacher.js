@@ -185,12 +185,11 @@ function draw() {
   const html = `
   <header class="thead">
     <div class="rc">课堂号码 <b>${room}</b></div>
-    <button class="chip" onclick="copyLink()">复制学生链接</button>
-    <span class="chip ${conn ? "okc" : "badc"}">${conn ? "已连线" : "连线中…"}</span>
-    <span class="chip">在线 <b>${nOnline()}</b></span>
-    ${helps.map((h) => `<button class="chip helpchip" onclick="resolveHelp(${h.seat})">${avatar(h.seat, 26)}<b>${esc(Roster.name(h.seat) || h.seat + " 号")}</b> 求救 · 处理了</button>`).join("")}
+    <button class="chip" onclick="copyLink()">复制链接</button>
+    <span class="chip ${conn ? "okc" : "badc"}">${conn ? "已连线" : "连线中…"} · 在线 <b>${nOnline()}</b></span>
+    ${helps.slice(0, 2).map((h) => `<button class="chip helpchip" title="点一下表示处理了" onclick="resolveHelp(${h.seat})">${avatar(h.seat, 26)}<b>${esc(Roster.name(h.seat) || h.seat + " 号")}</b> 求救</button>`).join("")}${helps.length > 2 ? `<span class="chip helpchip">+${helps.length - 2}</span>` : ""}
     <span class="grow"></span>
-    <button class="chip ${T.board ? "okc" : ""}" onclick="toggleBoard()">${T.board ? "学生正在看手写板" : "让学生看手写板"}</button>
+    <button class="chip ${T.board ? "okc" : ""}" onclick="toggleBoard()">${T.board ? "学生正在看板" : "让学生看板"}</button>
     <button class="chip ${tab === "run" ? "tabon" : ""}" onclick="setTab('run')">出题</button>
     <button class="chip ${tab === "board" ? "tabon" : ""}" onclick="setTab('board')">手写板</button>
     <button class="chip" onclick="editRoster()">名单</button>
